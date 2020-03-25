@@ -5,7 +5,8 @@ def main():
     #
     import socket
     s = socket.create_server(("localhost", 6379), reuse_port=True)
-    s.accept() # wait for client
+    sock, addr = s.accept() # wait for client
+    sock.send(b'+PONG\r\n')
 
 
 if __name__ == "__main__":
