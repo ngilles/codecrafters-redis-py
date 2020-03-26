@@ -8,6 +8,8 @@ class NotEnoughData(Exception):
 
 class RedisServer(asyncio.Protocol):
     
+    STORE = {}
+
     def connection_made(self, transport):
         self.recv_buffer = bytearray()
         self.recv_offset = 0
@@ -36,6 +38,11 @@ class RedisServer(asyncio.Protocol):
                             self.write_simple_string(b'PONG')
                     elif command == 'echo':
                         self.write_bulk_string(data[1])
+                    elif command == 'set':
+                        self.STORE[data[1]] = data[2]
+                        self.write_simple_string(b'OK')
+                    elif command == 'get':
+                        self.write_value(self.STORE.get(data[1]))
                     else:
                         self.write_simple_string(b'OK')
  
