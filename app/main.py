@@ -9,6 +9,7 @@ class NotEnoughData(Exception):
 class RedisServer(asyncio.Protocol):
     
     STORE = {}
+    EXPIRY = {}
 
     def connection_made(self, transport):
         self.recv_buffer = bytearray()
@@ -19,6 +20,11 @@ class RedisServer(asyncio.Protocol):
     def connection_lost(self, exc):
         return super().connection_lost(exc)
 
+    async def _expire_key(self, key, timeout):
+        await asyncio.sleep(timeout)
+        del self.STORE[key]
+        del self.EXPIRY[key]
+
     def data_received(self, raw_data):
         self.recv_buffer.extend(raw_data)
         try:
@@ -27,7 +33,7 @@ class RedisServer(asyncio.Protocol):
                 data, offset = self.read_value(0)
                 del self.recv_buffer[:offset]
 
-                #print('->', data)
+                print('->', data)
                 if isinstance(data, list):
                     # command?
                     command = data[0].decode().lower()
@@ -40,6 +46,16 @@ class RedisServer(asyncio.Protocol):
                         self.write_bulk_string(data[1])
                     elif command == 'set':
                         self.STORE[data[1]] = data[2]
+
+                        prev_exp = self.EXPIRY.get(data[1])
+                        if prev_exp is not None:
+                            prev_exp.cancel()
+
+                        if len(data) >= 5 and data[3].decode().lower() == 'px':
+                            self.EXPIRY[data[1]] = asyncio.create_task(self._expire_key(data[1], int(data[4].decode())/1000))
+                        elif len(data) >= 5 and data[3].decode().lower() == 'ex':
+                            self.EXPIRY[data[1]] = asyncio.create_task(self._expire_key(data[1], int(data[4].decode())))
+
                         self.write_simple_string(b'OK')
                     elif command == 'get':
                         self.write_value(self.STORE.get(data[1]))
