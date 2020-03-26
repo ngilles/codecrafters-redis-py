@@ -29,10 +29,15 @@ class RedisServer(asyncio.Protocol):
                 if isinstance(data, list):
                     # command?
                     command = data[0].decode().lower()
-                    if command == 'echo':
+                    if command == 'ping':
+                        if len(data) > 1:
+                            self.write_bulk_string(data[1])
+                        else:
+                            self.write_simple_string(b'PONG')
+                    elif command == 'echo':
                         self.write_bulk_string(data[1])
                     else:
-                        self.write_bulk_string(b'Welcome')
+                        self.write_simple_string(b'OK')
  
         except NotEnoughData as e:
             print(e)
